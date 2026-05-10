@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Example rekordbox.xml with mixed key formats for testing -->
+<DJ_PLAYLISTS Version="1.0.0">
+  <PRODUCT Name="rekordbox" Version="6.0.0" Company="Pioneer DJ"/>
+  <COLLECTION Entries="6">
+    <TRACK TrackID="1" Name="Already Camelot"   Artist="Test" Tonality="8A"/>
+    <TRACK TrackID="2" Name="Standard Minor"    Artist="Test" Tonality="Am"/>
+    <TRACK TrackID="3" Name="Standard Major"    Artist="Test" Tonality="C"/>
+    <TRACK TrackID="4" Name="MIK Long Form"     Artist="Test" Tonality="F# minor"/>
+    <TRACK TrackID="5" Name="Flat Notation"     Artist="Test" Tonality="Bbm"/>
+    <TRACK TrackID="6" Name="No Key"            Artist="Test" Tonality=""/>
+  </COLLECTION>
+</DJ_PLAYLISTS>

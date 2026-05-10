@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Backups created by this tool
+*.bak
+*.backup
+
+# Test data (don't commit real rekordbox.xml files)
+test_data/*.xml
+!test_data/example.xml
+
+# OS
+.DS_Store
+Thumbs.db
