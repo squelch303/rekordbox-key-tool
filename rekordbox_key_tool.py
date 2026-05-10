@@ -95,7 +95,12 @@ def process_xml(input_path: Path, output_path: Path, dry_run: bool, verbose: boo
     stats = {"converted": 0, "already": 0, "unknown": 0, "empty": 0, "total": 0}
     unknown_keys = set()
 
-    for track in root.iter("TRACK"):
+    collection = root.find("COLLECTION")
+    if collection is None:
+        print("Error: no <COLLECTION> element found in XML.", file=sys.stderr)
+        sys.exit(1)
+
+    for track in collection:
         name  = track.get("Name", "<unknown>")
         artist = track.get("Artist", "")
         raw_key = track.get("Tonality", "")
