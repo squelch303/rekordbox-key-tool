@@ -10,20 +10,49 @@ it sometimes writes keys in standard notation (`Am`, `C`, `F#m`) rather than
 the Camelot wheel format that rekordbox uses natively (`8A`, `8B`, `2B`).
 This tool fixes that — in bulk, across your whole library.
 
+## Install
+
+No external dependencies — uses the Python standard library only. Requires Python 3.8+.
+
+### With uv (recommended)
+
+```bash
+# Install uv if you don't have it
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clone and run — no install step needed
+git clone https://github.com/squelch303/rekordbox-key-tool
+cd rekordbox-key-tool
+uv run rekordbox-key-tool --help
+```
+
+### With pip
+
+```bash
+pip install -e .
+rekordbox-key-tool --help
+```
+
+### Without install
+
+```bash
+python rekordbox_key_tool.py --help
+```
+
 ## Usage
 
 ```bash
 # Preview changes without modifying anything
-python rekordbox_key_tool.py --input rekordbox.xml --dry-run
+rekordbox-key-tool --input rekordbox.xml --dry-run
 
 # Convert and write to a new file (recommended first run)
-python rekordbox_key_tool.py --input rekordbox.xml --output rekordbox_fixed.xml
+rekordbox-key-tool --input rekordbox.xml --output rekordbox_fixed.xml
 
 # Convert in-place (creates a .bak backup automatically)
-python rekordbox_key_tool.py --input rekordbox.xml --inplace
+rekordbox-key-tool --input rekordbox.xml --inplace
 
 # Verbose output — show every track that was changed
-python rekordbox_key_tool.py --input rekordbox.xml --output rekordbox_fixed.xml --verbose
+rekordbox-key-tool --input rekordbox.xml --output rekordbox_fixed.xml --verbose
 ```
 
 ## Where is rekordbox.xml?
@@ -65,10 +94,10 @@ After conversion, import it back: **File → Import Collection → From rekordbo
 | C# minor / Db minor | 12A |
 | E major | 12B |
 
-## Requirements
-
-Python 3.8+. No external dependencies — uses the standard library only.
-
 ## License
 
 MIT
+
+---
+
+Part of [squelch303](https://github.com/squelch303) · https://soundstation.net
