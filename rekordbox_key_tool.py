@@ -126,7 +126,7 @@ def process_xml(input_path: Path, output_path: Path, dry_run: bool, verbose: boo
 
     if unknown_keys:
         print(f"\n⚠  Unrecognised key values (not converted): {sorted(unknown_keys)}")
-        print("   Please report these at https://github.com/isd-labs/rekordbox-key-tool/issues")
+        print("   Please report these at https://github.com/squelch303/rekordbox-key-tool/issues")
 
     return stats
 

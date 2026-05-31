@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rekordbox-key-tool"
+version = "1.0.0"
+description = "Convert MIK-exported keys to Camelot notation in rekordbox.xml"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.8"
+dependencies = []
+
+[project.scripts]
+rekordbox-key-tool = "rekordbox_key_tool:main"
+
+[tool.setuptools]
+py-modules = ["rekordbox_key_tool"]
+
+[project.urls]
+Homepage = "https://soundstation.net"
+Repository = "https://github.com/squelch303/rekordbox-key-tool"
+Issues = "https://github.com/squelch303/rekordbox-key-tool/issues"
