@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import sys
 import xml.etree.ElementTree as ET
@@ -22,44 +23,64 @@ from pathlib import Path
 # Key mapping: standard / MIK notation -> Camelot Wheel
 # ---------------------------------------------------------------------------
 
-# All known input variants -> Camelot value
+# Standard notation (normalised: lower case, no spaces, "m" = minor) -> Camelot
 KEY_MAP = {
     # --- Minor keys (A) ---
-    "abm":  "1A",  "g#m":  "1A",  "ab minor": "1A",  "g# minor": "1A",
-    "ebm":  "2A",  "d#m":  "2A",  "eb minor": "2A",  "d# minor": "2A",
-    "bbm":  "3A",  "a#m":  "3A",  "bb minor": "3A",  "a# minor": "3A",
-    "fm":   "4A",                  "f minor":  "4A",
-    "cm":   "5A",                  "c minor":  "5A",
-    "gm":   "6A",                  "g minor":  "6A",
-    "dm":   "7A",                  "d minor":  "7A",
-    "am":   "8A",                  "a minor":  "8A",
-    "em":   "9A",                  "e minor":  "9A",
-    "bm":   "10A",                 "b minor":  "10A",
-    "f#m":  "11A", "gbm":  "11A", "f# minor": "11A", "gb minor": "11A",
-    "c#m":  "12A", "dbm":  "12A", "c# minor": "12A", "db minor": "12A",
+    "abm": "1A",  "g#m": "1A",
+    "ebm": "2A",  "d#m": "2A",
+    "bbm": "3A",  "a#m": "3A",
+    "fm":  "4A",
+    "cm":  "5A",
+    "gm":  "6A",
+    "dm":  "7A",
+    "am":  "8A",
+    "em":  "9A",
+    "bm":  "10A",
+    "f#m": "11A", "gbm": "11A",
+    "c#m": "12A", "dbm": "12A",
 
     # --- Major keys (B) ---
-    "b":    "1B",                  "b major":  "1B",
-    "f#":   "2B",  "gb":   "2B",  "f# major": "2B",  "gb major": "2B",
-    "db":   "3B",  "c#":   "3B",  "db major": "3B",  "c# major": "3B",
-    "ab":   "4B",  "g#":   "4B",  "ab major": "4B",  "g# major": "4B",
-    "eb":   "5B",  "d#":   "5B",  "eb major": "5B",  "d# major": "5B",
-    "bb":   "6B",  "a#":   "6B",  "bb major": "6B",  "a# major": "6B",
-    "f":    "7B",                  "f major":  "7B",
-    "c":    "8B",                  "c major":  "8B",
-    "g":    "9B",                  "g major":  "9B",
-    "d":    "10B",                 "d major":  "10B",
-    "a":    "11B",                 "a major":  "11B",
-    "e":    "12B",                 "e major":  "12B",
+    "b":   "1B",
+    "f#":  "2B",  "gb":  "2B",
+    "db":  "3B",  "c#":  "3B",
+    "ab":  "4B",  "g#":  "4B",
+    "eb":  "5B",  "d#":  "5B",
+    "bb":  "6B",  "a#":  "6B",
+    "f":   "7B",
+    "c":   "8B",
+    "g":   "9B",
+    "d":   "10B",
+    "a":   "11B",
+    "e":   "12B",
 }
 
 # Camelot values we recognise as already correct — skip these
 CAMELOT_VALUES = {f"{n}{s}" for n in range(1, 13) for s in ("A", "B")}
 
+CAMELOT_RE = re.compile(r"^0?([1-9]|1[0-2])([ab])$")   # 8a, 08A
+OPEN_KEY_RE = re.compile(r"^0?([1-9]|1[0-2])([md])$")  # Open Key: 1m = Am = 8A, 1d = C = 8B
+SEPARATORS_RE = re.compile(r"\s*[/|,]\s*|\s+-\s+")   # "Am/8A", "8A - Am"
 
-def normalise_key(raw: str) -> str | None:
-    """Normalise a raw key string to a KEY_MAP lookup key."""
-    return raw.strip().lower().replace("♭", "b").replace("♯", "#")
+
+def normalise_key(raw: str) -> str:
+    """Normalise a raw key string: 'F# Minor' -> 'f#m', 'A♭ maj' -> 'ab'."""
+    key = raw.strip().lower().replace("♭", "b").replace("♯", "#").replace(" ", "")
+    for long, short in (("minor", "m"), ("min", "m"), ("major", ""), ("maj", "")):
+        key = key.replace(long, short)
+    return key
+
+
+def to_camelot(raw: str) -> str | None:
+    """Convert a single key token to Camelot, or None if not recognised."""
+    key = normalise_key(raw)
+    m = CAMELOT_RE.match(key)
+    if m:
+        return f"{int(m.group(1))}{m.group(2).upper()}"
+    m = OPEN_KEY_RE.match(key)
+    if m:
+        number = (int(m.group(1)) + 6) % 12 + 1
+        return f"{number}{'A' if m.group(2) == 'm' else 'B'}"
+    return KEY_MAP.get(key)
 
 
 def convert_key(raw: str) -> tuple[str | None, str]:
@@ -72,17 +93,22 @@ def convert_key(raw: str) -> tuple[str | None, str]:
         'unknown'    – not recognised, left unchanged
         'empty'      – no key set
     """
-    if not raw:
+    if not raw or not raw.strip():
         return None, "empty"
 
     if raw in CAMELOT_VALUES:
         return raw, "already"
 
-    normalised = normalise_key(raw)
-    camelot = KEY_MAP.get(normalised)
+    camelot = to_camelot(raw)
+    if camelot is None:
+        # Combined formats like "Am/8A" or "8A - Am": every recognised part must agree
+        results = {to_camelot(part) for part in SEPARATORS_RE.split(raw.strip()) if part}
+        results.discard(None)
+        if len(results) == 1:
+            camelot = results.pop()
+
     if camelot:
         return camelot, "converted"
-
     return None, "unknown"
 
 
