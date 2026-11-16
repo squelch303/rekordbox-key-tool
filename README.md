@@ -63,6 +63,16 @@ rekordbox-key-tool --input rekordbox.xml --output rekordbox_fixed.xml
 rekordbox-key-tool --input rekordbox.xml --inplace
 ```
 
+## Update check
+
+When you run it yourself (not from a script or pipe), the tool asks GitHub for the latest
+release at most once a week and tells you at the end of the run if a newer version is out.
+It only sends a plain request to the GitHub releases API; nothing about your library leaves
+your computer. If GitHub can't be reached, it says nothing and carries on.
+
+Switch it off with `--no-update-check`, or set the environment variable
+`REKORDBOX_KEY_TOOL_NO_UPDATE_CHECK=1`.
+
 ## Recognised key formats
 
 | Format | Examples | Result |

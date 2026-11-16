@@ -13,14 +13,24 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import re
 import shutil
+import ssl
 import sys
+import time
+import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 
 __version__ = "1.1.0"
+
+RELEASES_API = "https://api.github.com/repos/squelch303/rekordbox-key-tool/releases/latest"
+RELEASES_URL = "https://github.com/squelch303/rekordbox-key-tool/releases/latest"
+UPDATE_CHECK_DAYS = 7
+NO_UPDATE_CHECK_ENV = "REKORDBOX_KEY_TOOL_NO_UPDATE_CHECK"
 
 # ---------------------------------------------------------------------------
 # Key mapping: standard / MIK notation -> Camelot Wheel
@@ -164,6 +174,94 @@ def process_xml(input_path: Path, output_path: Path, dry_run: bool, verbose: boo
 
 
 # ---------------------------------------------------------------------------
+# Update check
+# ---------------------------------------------------------------------------
+
+def parse_version(text: str) -> tuple[int, ...] | None:
+    """'v1.2.0' / '1.2' -> (1, 2, 0); None if it isn't a plain release version."""
+    m = re.match(r"^v?(\d+)\.(\d+)(?:\.(\d+))?$", text.strip())
+    return tuple(int(part or 0) for part in m.groups()) if m else None
+
+
+def cache_dir() -> Path:
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local"
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Caches"
+    else:
+        base = os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache"
+    return Path(base) / "rekordbox-key-tool"
+
+
+def fetch_latest_version(timeout: float = 3) -> str | None:
+    """Tag name of the latest GitHub release, e.g. 'v1.2.0'."""
+    context = ssl.create_default_context()
+    # The frozen macOS binary may not find Python's own CA bundle; the system one always exists
+    if sys.platform == "darwin" and Path("/etc/ssl/cert.pem").exists():
+        context.load_verify_locations("/etc/ssl/cert.pem")
+    request = urllib.request.Request(RELEASES_API, headers={
+        "Accept": "application/vnd.github+json",
+        "User-Agent": f"rekordbox-key-tool/{__version__}",
+    })
+    with urllib.request.urlopen(request, timeout=timeout, context=context) as response:
+        return json.load(response).get("tag_name")
+
+
+def check_for_update(state_file: Path | None = None, now: float | None = None,
+                     fetch=fetch_latest_version) -> str | None:
+    """
+    Return the newer version if one has been released, else None. Never raises.
+
+    Asks GitHub at most once every UPDATE_CHECK_DAYS and remembers the answer in
+    state_file, so the notice keeps showing between checks without going online.
+    """
+    state_file = state_file or cache_dir() / "update-check.json"
+    now = time.time() if now is None else now
+    try:
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        state = {}
+    if not isinstance(state, dict):
+        state = {}
+
+    last = state.get("checked")
+    if not isinstance(last, (int, float)) or not 0 <= now - last < UPDATE_CHECK_DAYS * 86400:
+        try:
+            latest = fetch()
+        except Exception:  # offline, rate limited, proxy, bad JSON... never get in the way
+            latest = None
+        if isinstance(latest, str) and parse_version(latest):
+            state["latest"] = latest
+        state["checked"] = now  # also after a failure, so offline users aren't slowed down every run
+        try:
+            state_file.parent.mkdir(parents=True, exist_ok=True)
+            state_file.write_text(json.dumps(state), encoding="utf-8")
+        except OSError:
+            pass
+
+    latest = state.get("latest")
+    latest_version = parse_version(latest) if isinstance(latest, str) else None
+    if latest_version and latest_version > parse_version(__version__):
+        return latest.strip().lstrip("v")
+    return None
+
+
+def update_check_wanted(args: argparse.Namespace) -> bool:
+    """Only in interactive runs: not in scripts, pipes, CI, or when switched off."""
+    if args.no_update_check or os.environ.get(NO_UPDATE_CHECK_ENV):
+        return False
+    return sys.stdout.isatty()
+
+
+def print_update_notice(latest: str) -> None:
+    print(f"\nA new version is available: {latest} (you have {__version__})")
+    if getattr(sys, "frozen", False):
+        print(f"Download it from {RELEASES_URL}")
+    else:
+        print(f"Upgrade with: pip install -U rekordbox-key-tool   (what's new: {RELEASES_URL})")
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -196,6 +294,9 @@ def main():
                         help="Show what would change without writing anything")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Print every conversion")
+    parser.add_argument("--no-update-check", action="store_true",
+                        help=f"Don't check GitHub for a newer version (checked at most every "
+                             f"{UPDATE_CHECK_DAYS} days; or set {NO_UPDATE_CHECK_ENV}=1)")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = parser.parse_args()
 
@@ -206,6 +307,11 @@ def main():
 
     try:
         run(parser, args, drop_mode)
+        # After the work is done, so a slow or missing network never delays the conversion
+        if update_check_wanted(args):
+            latest = check_for_update()
+            if latest:
+                print_update_notice(latest)
     finally:
         if pause:
             try:

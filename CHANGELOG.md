@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- Tells you when a newer version is out: checks GitHub at most once a week, only in interactive runs, silent when offline. Switch off with `--no-update-check` or `REKORDBOX_KEY_TOOL_NO_UPDATE_CHECK=1`
+
 ## [1.1.0] - 2026-11-16
 
 - Downloadable Windows .exe and macOS binary: drag `rekordbox.xml` onto the .exe to get `rekordbox_fixed.xml`

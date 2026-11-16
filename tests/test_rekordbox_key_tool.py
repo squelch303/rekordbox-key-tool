@@ -154,6 +154,74 @@ class CliTests(unittest.TestCase):
         result = run_cli("--version")
         self.assertIn(tool.__version__, result.stdout)
 
+    def test_no_update_check_flag(self):
+        result = run_cli("--input", str(self.xml), "--dry-run", "--no-update-check")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("new version", result.stdout)
+
+
+class UpdateCheckTests(unittest.TestCase):
+    DAY = 86400
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.state = self.tmp / "sub" / "update-check.json"
+        self.calls = 0
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def fetcher(self, tag):
+        def fetch():
+            self.calls += 1
+            if isinstance(tag, Exception):
+                raise tag
+            return tag
+        return fetch
+
+    def check(self, tag, now):
+        return tool.check_for_update(self.state, now=now, fetch=self.fetcher(tag))
+
+    def test_parse_version(self):
+        self.assertEqual(tool.parse_version("v1.2.0"), (1, 2, 0))
+        self.assertEqual(tool.parse_version("1.2"), (1, 2, 0))
+        self.assertIsNone(tool.parse_version("v2.0.0-beta1"))
+        self.assertIsNone(tool.parse_version("nightly"))
+
+    def test_newer_release_is_reported(self):
+        self.assertEqual(self.check("v99.0.0", now=1000), "99.0.0")
+        self.assertEqual(self.calls, 1)
+
+    def test_same_or_older_release_is_not_reported(self):
+        self.assertIsNone(self.check(f"v{tool.__version__}", now=1000))
+        self.assertIsNone(self.check("v0.1.0", now=1000 + 30 * self.DAY))
+
+    def test_asks_github_at_most_once_per_interval_but_keeps_notice(self):
+        self.assertEqual(self.check("v99.0.0", now=1000), "99.0.0")
+        self.assertEqual(self.check("v99.0.0", now=1000 + 6 * self.DAY), "99.0.0")
+        self.assertEqual(self.calls, 1)
+        self.check("v99.0.0", now=1000 + 7 * self.DAY)
+        self.assertEqual(self.calls, 2)
+
+    def test_network_failure_is_silent_and_not_retried_every_run(self):
+        self.assertIsNone(self.check(OSError("offline"), now=1000))
+        self.assertIsNone(self.check(OSError("offline"), now=1000 + self.DAY))
+        self.assertEqual(self.calls, 1)
+
+    def test_failure_keeps_last_known_version(self):
+        self.check("v99.0.0", now=1000)
+        self.assertEqual(self.check(OSError("offline"), now=1000 + 8 * self.DAY), "99.0.0")
+
+    def test_corrupt_state_file_is_ignored(self):
+        self.state.parent.mkdir(parents=True)
+        self.state.write_text("{not json", encoding="utf-8")
+        self.assertEqual(self.check("v99.0.0", now=1000), "99.0.0")
+
+    def test_clock_going_backwards_triggers_a_check(self):
+        self.check("v1.0.0", now=1000 + 30 * self.DAY)
+        self.check("v1.0.0", now=1000)
+        self.assertEqual(self.calls, 2)
+
 
 if __name__ == "__main__":
     unittest.main()
