@@ -18,6 +18,6 @@ rekordbox-key-tool = "rekordbox_key_tool:main"
 py-modules = ["rekordbox_key_tool"]
 
 [project.urls]
-Homepage = "https://soundstation.net"
+Homepage = "https://github.com/squelch303"
 Repository = "https://github.com/squelch303/rekordbox-key-tool"
 Issues = "https://github.com/squelch303/rekordbox-key-tool/issues"

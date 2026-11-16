@@ -100,4 +100,4 @@ MIT
 
 ---
 
-Part of [squelch303](https://github.com/squelch303) · https://soundstation.net
+Part of [squelch303](https://github.com/squelch303)
