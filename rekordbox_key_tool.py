@@ -4,6 +4,7 @@ rekordbox-key-tool
 Converts track keys in rekordbox.xml from standard/MIK notation to Camelot Wheel.
 
 Usage:
+    python rekordbox_key_tool.py rekordbox.xml            # writes rekordbox_fixed.xml
     python rekordbox_key_tool.py --input rekordbox.xml --dry-run
     python rekordbox_key_tool.py --input rekordbox.xml --output rekordbox_fixed.xml
     python rekordbox_key_tool.py --input rekordbox.xml --inplace
@@ -18,6 +19,8 @@ import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
+
+__version__ = "1.1.0"
 
 # ---------------------------------------------------------------------------
 # Key mapping: standard / MIK notation -> Camelot Wheel
@@ -180,19 +183,48 @@ def main():
             stream.reconfigure(encoding="utf-8", errors="replace")
 
     parser = argparse.ArgumentParser(
-        description="Convert rekordbox.xml track keys from MIK/standard notation to Camelot Wheel."
+        description="Convert rekordbox.xml track keys from MIK/standard notation to Camelot Wheel.",
+        epilog="Just a file and no options (or dragging rekordbox.xml onto the program) "
+               "writes <name>_fixed.xml next to it and leaves the original untouched.",
     )
-    parser.add_argument("--input",   "-i", required=True,  help="Path to rekordbox.xml")
+    parser.add_argument("xml", nargs="?", help="Path to rekordbox.xml (same as --input)")
+    parser.add_argument("--input",   "-i", default=None,   help="Path to rekordbox.xml")
     parser.add_argument("--output",  "-o", default=None,   help="Output file (default: print stats only)")
     parser.add_argument("--inplace", "-I", action="store_true",
-                        help="Modify input file in place (creates .bak backup first)")
+                        help="Modify input file in place (creates rekordbox.xml.bak first)")
     parser.add_argument("--dry-run", "-n", action="store_true",
                         help="Show what would change without writing anything")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Print every conversion")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = parser.parse_args()
 
-    input_path = Path(args.input)
+    # Drop mode: only a file was given (e.g. rekordbox.xml dragged onto the .exe)
+    drop_mode = bool(args.xml) and not (args.input or args.output or args.inplace or args.dry_run)
+    # A frozen .exe started by double-click or drag-and-drop closes its window at once — keep it open
+    pause = getattr(sys, "frozen", False) and (drop_mode or len(sys.argv) == 1)
+
+    try:
+        run(parser, args, drop_mode)
+    finally:
+        if pause:
+            try:
+                input("\nPress Enter to close...")
+            except EOFError:
+                pass
+
+
+def run(parser: argparse.ArgumentParser, args: argparse.Namespace, drop_mode: bool) -> None:
+    if args.xml and args.input:
+        parser.error("give the input file once: either as an argument or with --input")
+    if not (args.xml or args.input):
+        if getattr(sys, "frozen", False):
+            print("Drag your rekordbox.xml onto this program to convert it.")
+            print("rekordbox: File > Export Collection in xml format")
+            return
+        parser.error("no input file given (rekordbox-key-tool rekordbox.xml, or --input)")
+
+    input_path = Path(args.xml or args.input)
     if not input_path.exists():
         print(f"Error: {input_path} not found.", file=sys.stderr)
         sys.exit(1)
@@ -207,6 +239,8 @@ def main():
         output_path = Path(args.output)
         if output_path.resolve() == input_path.resolve():
             parser.error("--output is the same file as --input; use --inplace to overwrite (a backup is made)")
+    elif drop_mode:
+        output_path = input_path.with_name(f"{input_path.stem}_fixed{input_path.suffix}")
     else:
         output_path = None  # stats only
 
@@ -219,7 +253,11 @@ def main():
         shutil.copy2(input_path, backup)
         print(f"Backup created: {backup}")
 
-    stats = process_xml(input_path, output_path, dry_run=dry_run, verbose=args.verbose)
+    try:
+        stats = process_xml(input_path, output_path, dry_run=dry_run, verbose=args.verbose)
+    except ET.ParseError as e:
+        print(f"Error: {input_path} is not a valid XML file ({e}).", file=sys.stderr)
+        sys.exit(1)
 
     # Summary
     print(f"\nDone. Processed {stats['total']} tracks:")
@@ -230,6 +268,8 @@ def main():
 
     if not dry_run and output_path:
         print(f"\nWritten to: {output_path}")
+        if drop_mode:
+            print("Import it in rekordbox to update your keys (see README).")
 
 
 if __name__ == "__main__":
