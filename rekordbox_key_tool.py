@@ -9,6 +9,8 @@ Usage:
     python rekordbox_key_tool.py --input rekordbox.xml --inplace
 """
 
+from __future__ import annotations
+
 import argparse
 import shutil
 import sys
@@ -136,6 +138,11 @@ def process_xml(input_path: Path, output_path: Path, dry_run: bool, verbose: boo
 # ---------------------------------------------------------------------------
 
 def main():
+    # Output contains ✓ → ⚠ — force UTF-8 so Windows doesn't crash when stdout is piped/redirected
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(
         description="Convert rekordbox.xml track keys from MIK/standard notation to Camelot Wheel."
     )
