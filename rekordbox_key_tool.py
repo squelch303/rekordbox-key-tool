@@ -15,6 +15,7 @@ import argparse
 import shutil
 import sys
 import xml.etree.ElementTree as ET
+from datetime import datetime
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -137,6 +138,15 @@ def process_xml(input_path: Path, output_path: Path, dry_run: bool, verbose: boo
 # CLI
 # ---------------------------------------------------------------------------
 
+def backup_path(input_path: Path) -> Path:
+    """rekordbox.xml -> rekordbox.xml.bak; never overwrite an existing backup."""
+    backup = input_path.with_name(input_path.name + ".bak")
+    if backup.exists():
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        backup = input_path.with_name(f"{input_path.name}.{stamp}.bak")
+    return backup
+
+
 def main():
     # Output contains ✓ → ⚠ — force UTF-8 so Windows doesn't crash when stdout is piped/redirected
     for stream in (sys.stdout, sys.stderr):
@@ -161,21 +171,27 @@ def main():
         print(f"Error: {input_path} not found.", file=sys.stderr)
         sys.exit(1)
 
+    if args.inplace and args.output:
+        parser.error("use either --output or --inplace, not both")
+
     # Resolve output path
     if args.inplace:
-        backup = input_path.with_suffix(".bak")
-        shutil.copy2(input_path, backup)
-        print(f"Backup created: {backup}")
         output_path = input_path
     elif args.output:
         output_path = Path(args.output)
+        if output_path.resolve() == input_path.resolve():
+            parser.error("--output is the same file as --input; use --inplace to overwrite (a backup is made)")
     else:
-        output_path = None  # dry-run or stats only
+        output_path = None  # stats only
 
     dry_run = args.dry_run or output_path is None
 
-    if dry_run and not args.inplace:
+    if dry_run:
         print("Dry run — no files will be written.\n")
+    elif args.inplace:
+        backup = backup_path(input_path)
+        shutil.copy2(input_path, backup)
+        print(f"Backup created: {backup}")
 
     stats = process_xml(input_path, output_path, dry_run=dry_run, verbose=args.verbose)
 
