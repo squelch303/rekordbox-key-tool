@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.2.0] - 2026-11-16
 
 - Tells you when a newer version is out: checks GitHub at most once a week, only in interactive runs, silent when offline. Switch off with `--no-update-check` or `REKORDBOX_KEY_TOOL_NO_UPDATE_CHECK=1`
 

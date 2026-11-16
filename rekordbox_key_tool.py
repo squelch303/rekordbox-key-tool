@@ -25,7 +25,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 RELEASES_API = "https://api.github.com/repos/squelch303/rekordbox-key-tool/releases/latest"
 RELEASES_URL = "https://github.com/squelch303/rekordbox-key-tool/releases/latest"
